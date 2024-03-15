@@ -6,19 +6,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    if (builder.Environment.IsDevelopment())
-    {
-        options.UseSqlite(connectionString);
-    }
-    else
-    {
-        options.UseNpgsql(connectionString);
-    }
-});
 
-builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlite(connectionString));
+    builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+}
+else
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
+
 
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -30,8 +30,13 @@ var app = builder.Build();
 using (var services = app.Services.CreateScope())
 {
     var db = services.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    ApplicationDbInitializer.Initialize(db);
+
+    if (builder.Environment.IsDevelopment()) // Database initialization
+        ApplicationDbInitializer.Initialize(db);
+    else
+        await db.Database.MigrateAsync();
 }
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -43,7 +48,6 @@ else
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
-    app.UseMigrationsEndPoint();
 }
 
 app.UseHttpsRedirection();
